@@ -61,7 +61,7 @@ class UploadController extends Controller
     $this->validate($request, [
       'account' => 'required',
       'miscsale' => 'required',
-      'journal' => 'required',
+      // 'journal' => 'required',
     ]);
 
 
@@ -88,13 +88,13 @@ class UploadController extends Controller
     }
 
 
-    if ($request->hasFile('journal')) {
-      if ($requestJournal->extension() !== 'txt') {
-        return response()->json([
-          'message' => 'File uploaded successfully',
-        ], 400);
-      }
-    }
+    // if ($request->hasFile('journal')) {
+    //   if ($requestJournal->extension() !== 'txt') {
+    //     return response()->json([
+    //       'message' => 'File uploaded successfully',
+    //     ], 400);
+    //   }
+    // }
 
 
 
@@ -125,14 +125,16 @@ class UploadController extends Controller
 
 
     $journal = [];
-    $uploadedJournal = $request->file('journal');
-    $file = fopen($uploadedJournal, "r");
-    while (!feof($file)) {
-      $line = fgets($file);
-      $columns = explode("\t", $line);
-      array_push($journal, $columns);
+    if ($request->hasFile('journal')) {
+      $uploadedJournal = $request->file('journal');
+      $file = fopen($uploadedJournal, "r");
+      while (!feof($file)) {
+        $line = fgets($file);
+        $columns = explode("\t", $line);
+        array_push($journal, $columns);
+      }
+      fclose($file);
     }
-    fclose($file);
 
     // $request->session()->put('account', json_encode($account));
     // $request->session()->put('miscsale', json_encode($miscsale));
