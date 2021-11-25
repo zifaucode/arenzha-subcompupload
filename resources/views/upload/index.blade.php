@@ -31,7 +31,7 @@
         <table class="table">
             <tbody>
                 <tr v-for=" (row, index) in filteredMiscsales">
-                    <td><input type="checkbox" :value="i" v-model="checkedMiscsales"></td>
+                    <td><input type="checkbox" v-model="checkedMiscsales"></td>
                     <td v-for="data in row">@{{ data }}</td>
 
                 </tr>
@@ -73,18 +73,17 @@
                         <!-- <h3>Total amount : @{{ (total) }}</h3> -->
                         <div class="tab-pane p-3 active" id="miscsale + subcompany.id " role="tabpanel">
                             <select class="form-control multiple-select" :data-index="index" multiple>
-                                <option v-for="(i, index) in options" :value="'o' + i" :disabled="isSelected('o' + i)">@{{ i }}</option>
+                                <option v-for="(option, index) in subcompany.options" :key="option.value" :value="option.value">@{{ option.text }}</option>
                             </select>
                             <div style="max-height: 600px; overflow-y: scroll;">
                                 <table class="table">
-                                    <tr v-for="subcompanySale in subcompany.sales">
+                                    <tr v-for="subcompanySale in subcompanyMiscsales(subcompany.model)">
                                         <td v-for="data in subcompanySale">@{{ data }}</td>
                                     </tr>
                                 </table>
                             </div>
                             <pre>@{{ subcompany.model }}</pre>
                         </div>
-
                         <div class="tab-pane p-3" id="'journal' + $subcompany.id " role="tabpanel">
 
                         </div>
@@ -120,6 +119,7 @@
             names: [],
             amount: [],
             subcompanies: JSON.parse(`{!! json_encode($subcompanies) !!}`),
+            globalOptions: [],
             isLoading: false,
         },
         methods: {
@@ -133,11 +133,28 @@
                         if (!Array.isArray(data)) {
                             data = [];
                         }
+
+                        let names = [...new Set(data.map(sale => sale[0]))]
+
+                        const options = names.map(name => ({
+                            text: name,
+                            value: name,
+                            // selected: self.selectedOptions.includes('o' + name),
+                        }));
+
+                        self.subcompanies.map(subcompany => {
+                            subcompany.options = options;
+                            // subcompany.options = [];
+                            subcompany.model = [];
+                            return subcompany;
+                        })
+
                         self.isLoading = false;
-                        self.miscsales = data
+                        self.miscsales = data;
+                        self.globalOptions = options;
                     }).catch(error => {
                         self.isLoading = false;
-                        console.log(error.response.data)
+                        console.log(error.response)
                     })
             },
             onClickSaleButton() {
@@ -189,6 +206,41 @@
             },
             toCurrency: function(number) {
                 return new Intl.NumberFormat('De-de').format(number);
+            },
+            subcompanyMiscsales: function(names = []) {
+                let self = this;
+                return self.miscsales.filter(sale => names.indexOf(sale[0]) > -1);
+            },
+            filteredOptions: function(subcompany = null) {
+                let self = this;
+                if (subcompany == null) {
+                    return [];
+                }
+
+                // const {
+                //     options,
+                //     model
+                // } = subcompany;
+
+                let ownSelectedOptions = self.globalOptions.filter(option => {
+                    return subcompany.model.includes(option.value);
+                })
+                console.log(ownSelectedOptions);
+
+                let newOptions = self.globalOptions.filter(option => {
+                    return self.selectedOptions.includes(option.value) == false;
+                });
+
+                if (subcompany.id == 1) {
+                    newOptions.concat([{
+                        text: 'sdasd',
+                        value: 'sadasd'
+                    }]);
+                }
+                console.log(newOptions);
+
+                return newOptions;
+
             }
         },
         computed: {
@@ -205,17 +257,23 @@
             selectedOptions: function() {
                 let selectedOptions = this.subcompanies.map(subcompany => {
                     return subcompany.model
-                });
-                // return [...new Set(selectedOptions)];
-                return selectedOptions;
+                }).flat();
+                return [...new Set(selectedOptions)];
+                // return selectedOptions;
             },
-            options() {
+            options: function() {
                 // return this.miscsales.map(sale => sale[0])
                 //     .filter((sale, index, self) => {
                 //         return self.indexOf(sale) === index;
                 //     })
-                const names = this.miscsales.map(sale => sale[0]);
-                const options = [...new Set(names)];
+                let self = this;
+                let names = [...new Set(this.miscsales.map(sale => sale[0]))]
+                const options = names.map(name => ({
+                    text: name,
+                    value: 'o' + name,
+                    selected: self.selectedOptions.includes('o' + name),
+                }));
+                // const options = [...new Set(names.map(names))];
                 return options;
             },
             filteredMiscsales() {
@@ -227,15 +285,37 @@
 
                 // }
                 return self.miscsales;
-
             },
-
-            // checked() {
-            //     const names = this.miscsales.map(sale => sale[0]);
-            //     const options = [...new Set(names)];
-            //     return options;
-            // },
         },
+        watch: {
+            subcompanies: {
+                handler: function(newVal) {
+                    let self = this;
+                    // console.log(newVal);
+
+                    let mergedModel = this.subcompanies.map(subcompany => {
+                        return subcompany.model
+                    }).flat();
+                    const selectedOptions = [...new Set(mergedModel)];
+                    self.subcompanies.forEach(subcompany => {
+
+                        let ownSelectedOptions = self.globalOptions.filter(option => {
+                            return subcompany.model.includes(option.value);
+                        })
+                        // console.log(ownSelectedOptions);
+                        let unselectOptions = self.globalOptions.filter(option => {
+                            return selectedOptions.includes(option.value) == false;
+                        });
+
+                        let newOptions = ownSelectedOptions.concat(unselectOptions);
+
+                        subcompany.options = newOptions;
+
+                    })
+                },
+                deep: true,
+            }
+        }
 
     })
 </script>
@@ -270,13 +350,13 @@
 
         $('.multiple-select').on('change', function(e) {
             const index = $(this).attr('data-index');
-            console.log(index);
+            // console.log(index);
             const names = $(this).val();
-            console.log(names);
-            const filteredSales = app.$data.miscsales.filter(sale => names.indexOf('o' + sale[0]) > -1);
+            // console.log(names);
+            // const filteredSales = app.$data.miscsales.filter(sale => names.indexOf('o' + sale[0]) > -1);
             // console.log(filteredSales);
             app.$data.subcompanies[index].model = names;
-            app.$data.subcompanies[index].sales = filteredSales;
+            // app.$data.subcompanies[index].sales = filteredSales;
             // app.$data.subcompanies[index].sales = app.$data.miscsales.filter(sale => names.indexOf(sale[0]) > -1);
             // app.$data.subcompanies[index].sales = [['asdasd', 'werwer']];
             // console.log(app.$data);
